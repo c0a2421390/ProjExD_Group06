@@ -1,4 +1,3 @@
-# main.py
 import pygame
 import os
 import sys
@@ -45,6 +44,7 @@ def main():
         WALL_TILESET_IDX, WALL_TILE_IDX
     )
     
+    # 初期マップ生成
     map_gen.generate()
     
     trap_manager = TrapManager(tile_size=DEFAULT_TILE_SIZE)
@@ -72,8 +72,18 @@ def main():
                 running = False
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
+                    # マップ再生成
                     map_gen.generate()
                     trap_manager.generate_traps(map_gen, trap_count=30)
+                    
+                    # 階段を再生成
+                    if hasattr(map_gen, 'stairs_pos') and map_gen.stairs_pos:
+                        stairs = Stairs(map_gen.stairs_pos[0], map_gen.stairs_pos[1], DEFAULT_TILE_SIZE)
+                    else:
+                        last_room = map_gen.rooms[-1]
+                        stairs = Stairs(last_room.centerx, last_room.centery, DEFAULT_TILE_SIZE)
+                    
+                    current_floor = 1
                     camera_x = 0
                     camera_y = 0
                     player.tile_x = map_gen.rooms[0].centerx
@@ -100,6 +110,7 @@ def main():
         screen.fill((0, 0, 0))
         map_gen.draw(screen, camera_x, camera_y)
         trap_manager.draw(screen, camera_x, camera_y, show_traps)
+        stairs.draw(screen, camera_x, camera_y)
         
         player.draw(screen, camera_x, camera_y)
         
@@ -107,15 +118,15 @@ def main():
         text1 = font.render("SPACE: Regenerate | T: Toggle Traps", True, (255, 255, 255))
         
         tile_info = (f"Floor: TS{map_gen.floor_tileset}[{map_gen.floor_tile}] | "
-                f"Wall: TS{map_gen.wall_tileset}[{map_gen.wall_tile}] (48x48 Tiles)")
-        text2 = font.render(tile_info, True, (150, 200, 255))
+                f"Wall: TS{map_gen.wall_tileset}[{map_gen.wall_tile}]")
+        text2 = small_font.render(tile_info, True, (150, 200, 255))
         
         trap_status = "Visible" if show_traps else "Invisible"
-        trap_text = font.render(f"Traps: {len(trap_manager.traps)} ({trap_status})", True, (255, 255, 100))
+        trap_text = small_font.render(f"Traps: {len(trap_manager.traps)} ({trap_status})", True, (255, 255, 100))
 
-        screen.blit(text1, (10, 10))
-        screen.blit(text2, (10, 35))
-        screen.blit(trap_text, (10, 60))
+        screen.blit(text1, (10, 50))
+        screen.blit(text2, (10, 75))
+        screen.blit(trap_text, (10, 100))
         
         pygame.display.flip()
         clock.tick(60)
