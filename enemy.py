@@ -75,7 +75,13 @@ class Enemy:
 	def rect(self) -> pygame.Rect:
 		return self._rect
 
-	def move_towards_player(self, player_tile_x: int, player_tile_y: int, map_gen) -> None:
+	def move_towards_player(
+		self,
+		player_tile_x: int,
+		player_tile_y: int,
+		map_gen,
+		occupied: Optional[set] = None,
+	) -> bool:
 		"""
 		プレイヤーへの直線距離（ユークリッド距離）を最小化する隣接タイルへ1マスだけ移動する。
 
@@ -99,25 +105,34 @@ class Enemy:
 		# 現在の二乗距離（sqrtは不要）
 		curr_ds = (start_tx - ptx) * (start_tx - ptx) + (start_ty - pty) * (start_ty - pty)
 
-		# 四方向を評価して、距離が最小になる通行可能タイルを選ぶ
+		# 四方向を候補として距離でソートし、occupied に入っていない最良候補を選ぶ
 		dirs = [(1, 0), (-1, 0), (0, 1), (0, -1)]
-		best = None
-		best_ds = curr_ds
-
+		candidates = []
 		for dx, dy in dirs:
 			nx = start_tx + dx
 			ny = start_ty + dy
 			if 0 <= nx < width and 0 <= ny < height:
-				# 通行可能か
 				if map_gen.tilemap[nx][ny] == 1:
 					ds = (nx - ptx) * (nx - ptx) + (ny - pty) * (ny - pty)
-					if ds < best_ds:
-						best_ds = ds
-						best = (nx, ny)
+					candidates.append((ds, (nx, ny)))
 
-		if best:
-			nx, ny = best
+		if not candidates:
+			return False
+
+		candidates.sort(key=lambda x: x[0])
+
+		occ = occupied or set()
+
+		for _, (nx, ny) in candidates:
+			# プレイヤーや他の敵と重ならないようにチェック
+			if (nx, ny) in occ:
+				continue
+			# 移動実行
 			self.x = nx * self.tile_size
 			self.y = ny * self.tile_size
 			self._rect.topleft = (int(self.x), int(self.y))
+			return True
+
+		# 有効な候補が見つからなかった
+		return False
 

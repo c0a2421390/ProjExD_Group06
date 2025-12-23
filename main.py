@@ -13,6 +13,8 @@ from enemy import Enemy
 
 # MapGenerator内で定義されているデフォルトサイズを取得
 DEFAULT_TILE_SIZE = 48 
+# 部屋ごとの敵数（ここを変更して1部屋あたりの敵数を制御）
+ENEMIES_PER_ROOM = 2
 
 
 def main():
@@ -59,13 +61,24 @@ def main():
 
     enemies: List[Enemy] = []
     for room in map_gen.rooms:
-        # 部屋内のタイル座標をランダムに選び、ピクセル座標に変換
-        tx = random.randint(max(room.left + 1, 0), max(room.right - 2, room.left))
-        ty = random.randint(max(room.top + 1, 0), max(room.bottom - 2, room.top))
-        ex = tx * map_gen.tile_size
-        ey = ty * map_gen.tile_size
-        # 敵画像は未指定（フォールバック描画）。速度は適度に設定
-        enemies.append(Enemy(ex, ey, hp=20, speed=40.0, image_path="Assets/enemy_kyuri.png", tile_size=map_gen.tile_size))
+        # 各部屋に対して ENEMIES_PER_ROOM 体の敵を配置
+        for _ in range(ENEMIES_PER_ROOM):
+            # 部屋内のタイル座標をランダムに選び、ピクセル座標に変換
+            tx = random.randint(max(room.left + 1, 0), max(room.right - 2, room.left))
+            ty = random.randint(max(room.top + 1, 0), max(room.bottom - 2, room.top))
+            ex = tx * map_gen.tile_size
+            ey = ty * map_gen.tile_size
+            # 敵画像は未指定（フォールバック描画）。速度は適度に設定
+            enemies.append(
+                Enemy(
+                    ex,
+                    ey,
+                    hp=20,
+                    speed=40.0,
+                    image_path="Assets/enemy_kyuri.png",
+                    tile_size=map_gen.tile_size,
+                )
+            )
     
     # プレイヤー生成
     from move import Player
@@ -107,11 +120,29 @@ def main():
 
         # プレイヤーが1タイル移動したら敵を1マス進める
         if (player.tile_x, player.tile_y) != (prev_px, prev_py):
+            # 敵同士およびプレイヤーと重ならないように順次移動させる
+            # 初期 occupied は全ての敵のタイル座標とプレイヤーのタイル
+            occupied = set()
+            for ee in enemies:
+                etx = int(ee.x) // ee.tile_size
+                ety = int(ee.y) // ee.tile_size
+                occupied.add((etx, ety))
+            occupied.add((player.tile_x, player.tile_y))
+
             for e in enemies:
+                # 自分の現在位置を一旦開放して移動を試みる
+                cur = (int(e.x) // e.tile_size, int(e.y) // e.tile_size)
+                if cur in occupied:
+                    occupied.remove(cur)
+
                 try:
-                    e.move_towards_player(player.tile_x, player.tile_y, map_gen)
+                    moved = e.move_towards_player(player.tile_x, player.tile_y, map_gen, occupied=occupied)
                 except Exception:
-                    pass
+                    moved = False
+
+                # 移動後の位置を占有セットに追加
+                new_pos = (int(e.x) // e.tile_size, int(e.y) // e.tile_size)
+                occupied.add(new_pos)
         
         # カメラをプレイヤーに追従
         camera_x, camera_y = player.get_camera_pos(
